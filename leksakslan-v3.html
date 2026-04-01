@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Boden – Skolgård</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy:       #0f1729;
+  --navy-2:     #1a2540;
+  --accent:     #4f8ef7;
+  --accent-2:   #3a7af0;
+  --text:       #f0f4ff;
+  --text-muted: #8896b0;
+  --surface:    #1e2d4a;
+  --surface-2:  #253654;
+  --border:     rgba(255,255,255,0.08);
+  --radius:     14px;
+  --radius-sm:  8px;
+  --shadow:     0 4px 24px rgba(0,0,0,0.3);
+  --sidebar-w:  240px;
+  --header-h:   60px;
+  --green:      #4ade80;
+  --green-bg:   rgba(74,222,128,0.12);
+  --red:        #f87171;
+  --red-bg:     rgba(248,113,113,0.12);
+  --orange:     #fb923c;
+  --orange-bg:  rgba(251,146,60,0.12);
+  --sidebar-transition: 0.25s ease;
+}
+html, body { height: 100%; overflow: hidden; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--navy); color: var(--text); font-size: 16px; -webkit-font-smoothing: antialiased; }
+.app { display: flex; height: 100dvh; position: relative; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--navy-2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 100; flex-shrink: 0;
+  transition: transform var(--sidebar-transition), width var(--sidebar-transition);
+  overflow: hidden;
+}
+.sidebar.collapsed {
+  transform: translateX(calc(-1 * var(--sidebar-w)));
+  width: 0;
+}
+.sidebar-brand { padding: 24px 20px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-brand h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; white-space: nowrap; }
+.sidebar-brand p  { font-size: 12px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; }
+.sidebar nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; }
+.nav-btn { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--text-muted); font-size: 15px; cursor: pointer; text-align: left; width: 100%; transition: background 0.15s, color 0.15s; font-family: inherit; white-space: nowrap; }
+.nav-btn:hover  { background: var(--surface); color: var(--text); }
+.nav-btn.active { background: var(--accent-2); color: #fff; }
+.nav-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+.sidebar-footer { padding: 12px 10px; border-top: 1px solid var(--border); }
+
+/* ── MOBILE OVERLAY ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+.sidebar-overlay.visible { display: block; }
+
+/* ── MAIN ── */
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.topbar { height: var(--header-h); display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--navy-2); gap: 12px; flex-shrink: 0; }
+
+/* Toggle button */
+.sidebar-toggle {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+.sidebar-toggle:hover { background: var(--surface-2); border-color: var(--accent); }
+
+.topbar-title { font-size: 17px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-badge { background: var(--accent-2); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+.hidden { display: none !important; }
+#view { flex: 1; overflow-y: auto; padding: 20px; }
+#view::-webkit-scrollbar { width: 6px; }
+#view::-webkit-scrollbar-track { background: transparent; }
+#view::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 3px; }
+
+/* ── VIEW HEADER ── */
+.view-header { margin-bottom: 20px; }
+.view-header h2 { font-size: 22px; font-weight: 700; }
+.view-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+/* ── BREADCRUMB ── */
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px; flex-wrap: wrap; }
+.bc-item { cursor: pointer; transition: color 0.15s; }
+.bc-item:hover { color: var(--accent); }
+.bc-sep { opacity: 0.4; }
+.bc-cur { color: var(--text); font-weight: 600; }
+
+/* ── PICK GRID ── */
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.pick-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 14px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; transition: border-color 0.15s, transform 0.15s, background 0.15s; }
+.pick-card:hover { border-color: var(--accent); background: var(--surface-2); transform: translateY(-2px); }
+.pc-emoji { font-size: 38px; line-height: 1; }
+.pc-label { font-weight: 700; font-size: 15px; }
+.pc-sub   { font-size: 12px; color: var(--text-muted); }
+
+/* ── CHILDREN ── */
+.child-list { display: flex; flex-direction: column; gap: 8px; }
+.child-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.child-row:hover:not(.locked) { border-color: var(--accent); background: var(--surface-2); }
+.child-row.locked { cursor: default; border-color: rgba(251,146,60,0.35); }
+.child-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--accent-2); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.child-avatar.warn { background: var(--orange-bg); font-size: 20px; }
+.child-info { flex: 1; min-width: 0; }
+.child-name { font-weight: 600; font-size: 15px; }
+.child-sub  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.child-sub.warn { color: var(--orange); }
+.pill { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; flex-shrink: 0; }
+.pill.free { background: var(--green-bg); color: var(--green); }
+.pill.busy { background: var(--orange-bg); color: var(--orange); }
+
+/* ── TOYS ── */
+.toy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.toy-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 14px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; transition: border-color 0.15s, transform 0.15s, background 0.15s; }
+.toy-card:hover:not(.out) { border-color: var(--accent); background: var(--surface-2); transform: translateY(-2px); }
+.toy-card.out { opacity: 0.38; cursor: not-allowed; }
+.toy-emoji { font-size: 40px; line-height: 1; }
+.toy-name  { font-weight: 700; font-size: 14px; }
+.toy-pill  { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.toy-pill.ok  { background: var(--green-bg); color: var(--green); }
+.toy-pill.low { background: var(--red-bg);   color: var(--red);   }
+.toy-pill.out { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+
+/* ── LOANS ── */
+.loan-list { display: flex; flex-direction: column; gap: 8px; }
+.loan-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px 16px; display: flex; align-items: center; gap: 14px; }
+.loan-icon { font-size: 30px; flex-shrink: 0; }
+.loan-info { flex: 1; min-width: 0; }
+.loan-name { font-weight: 600; font-size: 15px; }
+.loan-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.btn-ret { padding: 8px 14px; border-radius: var(--radius-sm); background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,113,113,0.2); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; white-space: nowrap; flex-shrink: 0; }
+.btn-ret:hover { background: var(--red); color: #fff; }
+
+/* ── BUTTONS ── */
+.btn { padding: 10px 18px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; transition: filter 0.15s, transform 0.15s; }
+.btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-primary { background: var(--accent-2); color: #fff; }
+.btn-ghost   { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-danger  { background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+.btn-danger:hover { background: var(--red) !important; color: #fff !important; filter: none; }
+
+/* ── ADMIN ── */
+.adm-sec { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.adm-sec h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.adm-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius-sm); margin-bottom: 6px; border: 1px solid var(--border); flex-wrap: wrap; }
+.adm-row .ar-em { font-size: 20px; }
+.adm-row .ar-nm { flex: 1; font-weight: 600; font-size: 14px; min-width: 80px; }
+.adm-row .ar-sb { font-size: 12px; color: var(--text-muted); }
+.cnt-ctrl { display: flex; align-items: center; gap: 6px; }
+.cnt-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; line-height: 1; }
+.cnt-btn:hover { border-color: var(--accent); }
+.cnt-num { font-weight: 700; font-size: 15px; min-width: 24px; text-align: center; }
+.add-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--border); }
+.field { flex: 1; min-width: 100px; padding: 9px 12px; background: var(--navy); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+.field::placeholder { color: var(--text-muted); }
+.field:focus { border-color: var(--accent-2); }
+select.field { cursor: pointer; }
+.cls-block { background: var(--surface-2); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 8px; border: 1px solid var(--border); }
+.cls-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.cls-title { font-weight: 700; font-size: 14px; flex: 1; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px 4px 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.tag-x { background: none; border: none; cursor: pointer; color: var(--red); font-size: 16px; padding: 0; line-height: 1; opacity: 0.7; }
+.tag-x:hover { opacity: 1; }
+
+/* ── PROMOTE ── */
+.promo-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent-2); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.promo-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.promo-card > p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+.promo-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.promo-row:last-of-type { border: none; }
+.promo-from { flex: 1; font-weight: 600; }
+.promo-arr  { color: var(--accent); }
+.promo-to   { color: var(--text-muted); font-size: 13px; }
+
+/* ── MODAL ── */
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; backdrop-filter: blur(4px); }
+.modal-bg.hidden { display: none; }
+.modal { background: var(--navy-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; max-width: 400px; width: 100%; box-shadow: var(--shadow); animation: pop 0.18s ease; }
+@keyframes pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.modal > p { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+.modal-acts { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* ── PASSWORD MODAL ── */
+.pw-wrap { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.pw-wrap label { font-size: 13px; color: var(--text-muted); }
+.pw-input { width: 100%; padding: 11px 14px; background: var(--navy); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 16px; font-family: inherit; outline: none; transition: border-color 0.15s; letter-spacing: 3px; }
+.pw-input:focus { border-color: var(--accent-2); }
+.pw-error { font-size: 13px; color: var(--red); display: none; }
+.pw-error.visible { display: block; }
+
+/* ── TOAST ── */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface-2); color: var(--text); border: 1px solid var(--border); padding: 11px 22px; border-radius: 100px; font-weight: 600; font-size: 14px; z-index: 300; transition: transform 0.25s ease; pointer-events: none; white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ── EMPTY ── */
+.empty { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.empty .ei { font-size: 52px; }
+.empty p { font-size: 15px; font-weight: 500; color: var(--text-muted); }
+
+/* ── SEARCH BOX ── */
+.search-box-wrap { position: relative; margin-bottom: 16px; display: flex; align-items: center; }
+.search-box-icon { position: absolute; left: 13px; font-size: 16px; pointer-events: none; }
+.search-box { width: 100%; padding: 12px 40px 12px 40px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 16px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+.search-box::placeholder { color: var(--text-muted); }
+.search-box:focus { border-color: var(--accent-2); }
+.search-clear { position: absolute; right: 10px; background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; padding: 6px; border-radius: 50%; line-height: 1; transition: color 0.15s; }
+.search-clear:hover { color: var(--text); }
+.search-clear.hidden { display: none; }
+.search-cls-tag { display: none; }
+.search-cls-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 700;
+  color: #fff; background: var(--accent-2);
+  padding: 3px 10px; border-radius: 6px;
+  white-space: nowrap; letter-spacing: 0.01em;
+}
+.search-cls-badge.fsk { background: #16803c; }
+.search-cls-badge.ak1 { background: #3a7af0; }
+.search-cls-badge.ak2 { background: #7c3aed; }
+.search-cls-badge.ak3 { background: #b45309; }
+
+/* ── MOBILE / TABLET ── */
+@media (max-width: 768px) {
+  /* Sidebar floats on mobile */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    transform: translateX(calc(-1 * var(--sidebar-w)));
+    width: var(--sidebar-w) !important;
+    box-shadow: var(--shadow);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar.collapsed {
+    transform: translateX(calc(-1 * var(--sidebar-w)));
+    width: var(--sidebar-w) !important;
+  }
+  /* Content fills full width */
+  .content { width: 100%; }
+  /* Bigger touch targets */
+  .pick-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .toy-grid  { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  #view { padding: 16px; }
+  .topbar { padding: 0 12px; }
+  .view-header h2 { font-size: 20px; }
+  .loan-row { flex-wrap: wrap; }
+  .add-form { flex-direction: column; align-items: stretch; }
+  .add-form .btn { width: 100%; }
+  .field { min-width: unset; width: 100%; }
+  .modal { padding: 20px; }
+  .modal-acts { flex-direction: column-reverse; }
+  .modal-acts .btn { width: 100%; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .pick-grid { grid-template-columns: repeat(2, 1fr); }
+  .toy-grid  { grid-template-columns: repeat(2, 1fr); }
+  .topbar-title { font-size: 15px; }
+  .child-row { padding: 11px 12px; gap: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Overlay for mobile -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <h1>🏫 Boden</h1>
+    <p>Skolgårdsbibliotek</p>
+  </div>
+  <nav>
+    <button class="nav-btn active" id="nb-klass" onclick="go('klass')">
+      <span class="nav-icon">🏷️</span> Välj klass
+    </button>
+    <button class="nav-btn" id="nb-sok" onclick="go('sok')">
+      <span class="nav-icon">🔍</span> Sök elev
+    </button>
+    <button class="nav-btn" id="nb-lan" onclick="go('lan')">
+      <span class="nav-icon">📋</span> Aktiva lån
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="nav-btn" id="nb-admin" onclick="goAdmin()">
+      <span class="nav-icon">⚙️</span> Admin
+    </button>
+  </div>
+</aside>
+
+<div class="content">
+  <div class="topbar">
+    <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Visa/dölj meny">☰</button>
+    <div class="topbar-title" id="ttitle">Välj klass</div>
+    <div class="topbar-badge hidden" id="tbadge"></div>
+  </div>
+  <div id="view"></div>
+</div>
+
+</div>
+
+<!-- General modal -->
+<div class="modal-bg hidden" id="mbg" onclick="mbgClick(event)">
+  <div class="modal" id="modal">
+    <h3 id="mt"></h3>
+    <p id="md"></p>
+    <div id="mb"></div>
+    <div class="modal-acts" id="ma"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script>
+let adminUnlocked = true;
+
+/* ── FIREBASE ── */
+firebase.initializeApp({
+  apiKey: "AIzaSyA4P8w8P_Wed-KWTpfhq4Z0wAQ_Jycgmds",
+  authDomain: "boden-dd98f.firebaseapp.com",
+  projectId: "boden-dd98f",
+  storageBucket: "boden-dd98f.firebasestorage.app",
+  messagingSenderId: "476168825372",
+  appId: "1:476168825372:web:96eb33e2f6fb43eac28dd9"
+});
+const db = firebase.firestore();
+
+/* ── FIRESTORE HELPERS ── */
+async function fsLoadState() {
+  try {
+    // Load toys
+    const toysSnap = await db.collection('toys').get();
+    if (!toysSnap.empty) {
+      toysSnap.forEach(doc => {
+        const t = S.toys.find(x => x.id === doc.id);
+        if (t) { t.total = doc.data().total; t.available = doc.data().available; }
+      });
+    } else {
+      // First time: save default toys
+      const batch = db.batch();
+      S.toys.forEach(t => batch.set(db.collection('toys').doc(t.id), {emoji:t.emoji,name:t.name,total:t.total,available:t.available}));
+      await batch.commit();
+    }
+    // Load loans
+    const loansSnap = await db.collection('loans').get();
+    S.loans = [];
+    loansSnap.forEach(doc => S.loans.push({...doc.data(), id: doc.id}));
+    badge();
+  } catch(err) { console.warn('fsLoadState:', err); }
+}
+
+async function fsSaveToy(toy) {
+  try { await db.collection('toys').doc(toy.id).set({emoji:toy.emoji,name:toy.name,total:toy.total,available:toy.available}); }
+  catch(err) { console.warn('fsSaveToy:', err); }
+}
+
+async function fsAddLoan(loan) {
+  try {
+    const ref = db.collection('loans').doc(String(loan.id));
+    await ref.set(loan);
+  } catch(err) { console.warn('fsAddLoan:', err); }
+}
+
+async function fsRemoveLoan(id) {
+  try { await db.collection('loans').doc(String(id)).delete(); }
+  catch(err) { console.warn('fsRemoveLoan:', err); }
+}
+
+async function fsAddToy(toy) {
+  try { await db.collection('toys').doc(toy.id).set({emoji:toy.emoji,name:toy.name,total:toy.total,available:toy.available}); }
+  catch(err) { console.warn('fsAddToy:', err); }
+}
+
+async function fsDeleteToy(id) {
+  try { await db.collection('toys').doc(id).delete(); }
+  catch(err) { console.warn('fsDeleteToy:', err); }
+}
+
+const S = {
+  grades: [
+    { id:'g0', name:'Åk 0 (Förskoleklass)', emoji:'🌱', classes:['Fa','Fb','Fc'] },
+    { id:'g1', name:'Åk 1', emoji:'1️⃣', classes:['1A','1B'] },
+    { id:'g2', name:'Åk 2', emoji:'2️⃣', classes:['2A','2B','2C','2D'] },
+  ],
+  children: {
+    'Fa':['Melina','Himank','Lara','Liam','Atlas','Angelo','Derin','Diya','Josef',
+          'Marcus','Melvin','Mikael','Nicholas','Sam','Tyr','Kiyan','Samaira',
+          'Elin','Laura','Liana','Lukas','Princy','Zorowar','Clara','Melissa','Nina'],
+    'Fb':['Kail','Mateo','Kiara','Lena','Elsa','Esther','Filip','Kefas','Liah',
+          'Oscar','Rojin','Milio','Ivica','Alva','Hanna','Linn','Liv','Stella',
+          'Tim','Edward','Karl','Nirupam','Amelia','Philip','Victoria'],
+    'Fc':['Elise','Elsie','Freja','Mio','Theodor','Lillie','Raphael','William',
+          'Celine','Oskar','Anaaya','Damien','Liam','Oliver','Svante','Amelie',
+          'Magizhnira','Aryan','Ayanna','Riansh','Deekshita','Filippa','Viyan'],
+    '1A':['Maxine','Noelia','Mia','Aleksandar','Bella','Harry','Leonie','Adam',
+          'August','Ema','Hildana','Lillian','Minou','Noa','Theo','Anlin','Yohan',
+          'Sveva','Vaani','Lydia','Lovis','Penny','Noah.V','Leo','Anton','Emilija'],
+    '1B':['Aditya','Arvin','Baran','Jonathan','Danielle','Leia','Louise','Talya',
+          'Alicia P','Jhanvi','Tage','Justina','Matvei','Alice','Alicia RM',
+          'Emilia','Greta','Kai','Mateo','Nora','Viggo','Freja','Lou','Ellinor','Emma'],
+    '2A':['Evelyn','Theodor','Draco','Elias','Mirelle','Alfred','Yibo','Filip',
+          'Melánia','Estelle','Leo','Victoria','Hugo','Hilda','Nils','Aarya',
+          'Andrei','Kendal','Maya','Mikael'],
+    '2B':['Alexander','Astor','Katerina','Charles','Elin','Naya','Robin','Allan',
+          'Adrian L','Adrian CL','Chloe','Ino','Isabell','Luca','Mia','Noelle',
+          'Arnika','Cleo','Fredrika'],
+    '2C':['Zekeriya','Markus','Huda','Selma','Attila','Noah','Mira','Maja',
+          'Michelle','Luka','Svea','Vincent','Defne','Fiona','Joline','Maximilian',
+          'Maximus','Nika','Victor','Melika','Sara'],
+    '2D':['Liyan','Aadya','Astrid','Elisha','Lucas','Filip','Jordan','Elias',
+          'Alan','Arvid','Liam','Mayra','Miriam','Nazanin','Nova','Vincent',
+          'Linus','Astrid','Gynisha','Maria','Bilge'],
+  },
+  toys:[
+    {id:'t1',emoji:'⚽',name:'Fotboll',   total:4,available:4},
+    {id:'t2',emoji:'🏀',name:'Basketboll',total:2,available:2},
+    {id:'t3',emoji:'🎾',name:'Tennisboll',total:6,available:6},
+    {id:'t4',emoji:'🏓',name:'Pingisboll',total:4,available:4},
+    {id:'t5',emoji:'🪃',name:'Frisbee',   total:3,available:3},
+    {id:'t6',emoji:'🎿',name:'Hopprep',   total:5,available:5},
+  ],
+  loans:[],
+  uid:100,
+};
+let nav={grade:null,cls:null,child:null};
+
+/* ── SIDEBAR TOGGLE ── */
+let sidebarOpen = window.innerWidth > 768; // open on desktop, closed on mobile
+
+function toggleSidebar(){
+  if(window.innerWidth <= 768){
+    sidebarOpen = !sidebarOpen;
+    document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+    document.getElementById('sidebar-overlay').classList.toggle('visible', sidebarOpen);
+  } else {
+    sidebarOpen = !sidebarOpen;
+    document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  }
+  document.getElementById('sidebar-toggle').textContent = sidebarOpen ? '✕' : '☰';
+}
+
+function closeSidebar(){
+  sidebarOpen = false;
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('visible');
+  document.getElementById('sidebar-toggle').textContent = '☰';
+}
+
+// On resize, fix sidebar state
+window.addEventListener('resize', () => {
+  if(window.innerWidth > 768){
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('visible');
+    document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  } else {
+    document.getElementById('sidebar').classList.remove('collapsed');
+    document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+    document.getElementById('sidebar-overlay').classList.toggle('visible', sidebarOpen);
+  }
+});
+
+/* ── ADMIN ── */
+function goAdmin(){
+  go('admin');
+  if(window.innerWidth <= 768) closeSidebar();
+}
+
+/* ── ROUTER ── */
+function go(sec){
+  ['klass','sok','lan','admin'].forEach(s=>{
+    const el = document.getElementById('nb-'+s);
+    if(el) el.classList.toggle('active',s===sec);
+  });
+  const titles={klass:'Välj klass',sok:'🔍 Sök elev',lan:'Aktiva lån',admin:'⚙️ Admin'};
+  document.getElementById('ttitle').textContent=titles[sec];
+  badge();
+  if(sec==='klass'){nav={grade:null,cls:null,child:null};viewGrades();}
+  if(sec==='sok')  viewSearch();
+  if(sec==='lan')  viewLoans();
+  if(sec==='admin')viewAdmin();
+  // Close sidebar on mobile after navigation
+  if(window.innerWidth <= 768) closeSidebar();
+}
+
+function badge(){
+  const el=document.getElementById('tbadge');
+  if(S.loans.length){el.textContent=S.loans.length+' aktiva lån';el.classList.remove('hidden');}
+  else el.classList.add('hidden');
+}
+
+/* ── SEARCH ── */
+function viewSearch(){
+  setv(`<div class="view-header"><h2>Sök elev</h2><p>Sök på namn – se klass och lånestatus</p></div>
+    <div class="search-box-wrap">
+      <span class="search-box-icon">🔍</span>
+      <input class="search-box" id="search-input" type="text" placeholder="Skriv ett namn…"
+        oninput="renderSearchResults(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="search-clear hidden" id="search-clear" onclick="clearSearch()">✕</button>
+    </div>
+    <div id="search-results"></div>`);
+  setTimeout(()=>document.getElementById('search-input')?.focus(),100);
+}
+
+function clearSearch(){
+  const inp=document.getElementById('search-input');
+  if(inp){inp.value='';inp.focus();}
+  document.getElementById('search-clear')?.classList.add('hidden');
+  document.getElementById('search-results').innerHTML='';
+  const gc=document.getElementById('grade-cards');
+  if(gc) gc.style.display='';
+}
+
+function renderSearchResults(q){
+  const clrBtn=document.getElementById('search-clear');
+  if(clrBtn) clrBtn.classList.toggle('hidden', q.length===0);
+  const res=document.getElementById('search-results');
+  const gradeCards=document.getElementById('grade-cards');
+  if(!q.trim()){
+    res.innerHTML='';
+    if(gradeCards) gradeCards.style.display='';
+    return;
+  }
+  if(gradeCards) gradeCards.style.display='none';
+  const term=q.trim().toLowerCase();
+  // gather all matches
+  const matches=[];
+  S.grades.forEach(g=>{
+    g.classes.forEach(cls=>{
+      (S.children[cls]||[]).forEach(name=>{
+        if(name.toLowerCase().startsWith(term)){
+          const loan=S.loans.find(l=>l.child===name&&l.cls===cls);
+          matches.push({name,cls,grade:g.name,loan});
+        }
+      });
+    });
+  });
+  if(!matches.length){
+    res.innerHTML=`<div class="empty"><div class="ei">🔍</div><p>Inga elever matchar "${e(q)}"</p></div>`;
+    return;
+  }
+  // sort alphabetically
+  matches.sort((a,b)=>a.name.localeCompare(b.name,'sv'));
+  const rows=matches.map(m=>{
+    const init=m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const locked=!!m.loan;
+    return `<div class="child-row ${locked?'locked':''}" ${locked?'':(`onclick="navToChild('${e(m.cls)}','${e(m.name)}')"`)}>
+      <div class="child-avatar ${locked?'warn':''}">${locked?'⚠️':init}</div>
+      <div class="child-info">
+        <div class="child-name">${e(m.name)}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+          <span class="search-cls-badge ${m.cls==='Fa'||m.cls==='Fb'||m.cls==='Fc'?'fsk':m.cls.startsWith('1')?'ak1':m.cls.startsWith('2')?'ak2':'ak3'}">
+            🏫 ${e(m.cls)}
+          </span>
+          <span style="font-size:12px;color:var(--text-muted)">${e(m.grade)}</span>
+        </div>
+        <div class="child-sub ${locked?'warn':''}" style="margin-top:3px">
+          ${locked?m.loan.toyEmoji+' '+e(m.loan.toyName):'Ingen aktiv leksak'}
+        </div>
+      </div>
+      <span class="pill ${locked?'busy':'free'}" style="flex-shrink:0">${locked?'Har lån':'Ledig'}</span>
+    </div>`;
+  }).join('');
+  res.innerHTML=`<div class="child-list">${rows}</div>`;
+}
+
+function navToChild(cls,name){
+  // find which grade this class belongs to
+  const g=S.grades.find(gr=>gr.classes.includes(cls));
+  if(g) nav.grade=g.id;
+  nav.cls=cls; nav.child=null;
+  go('klass');
+  // navigate to toy selection
+  viewToys(name);
+  document.getElementById('ttitle').textContent=e(name);
+}
+
+/* ── GRADES ── */
+function viewGrades(){
+  const cards=S.grades.map(g=>{
+    const tot=g.classes.reduce((a,c)=>a+(S.children[c]?.length||0),0);
+    return `<div class="pick-card" onclick="viewClasses('${g.id}')">
+      <div class="pc-emoji">${g.emoji}</div>
+      <div class="pc-label">${g.name}</div>
+      <div class="pc-sub">${g.classes.length} klasser · ${tot} elever</div>
+    </div>`;
+  }).join('');
+  setv(`
+    <div class="search-box-wrap">
+      <span class="search-box-icon">🔍</span>
+      <input class="search-box" id="search-input" type="text" placeholder="Sök elev…"
+        oninput="renderSearchResults(this.value)" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="search-clear hidden" id="search-clear" onclick="clearSearch()">✕</button>
+    </div>
+    <div id="search-results"></div>
+    <div id="grade-cards">
+      <div class="view-header"><h2>Välj årskurs</h2><p>Välj en klass för att se eleverna</p></div>
+      <div class="pick-grid">${cards}</div>
+    </div>`);
+}
+
+function viewClasses(gid){
+  nav.grade=gid; nav.cls=null; nav.child=null;
+  const g=S.grades.find(x=>x.id===gid);
+  const cards=g.classes.map(cls=>{
+    const n=S.children[cls]?.length||0;
+    return `<div class="pick-card" onclick="viewChildren('${e(cls)}')">
+      <div class="pc-emoji">🏫</div>
+      <div class="pc-label">${e(cls)}</div>
+      <div class="pc-sub">${n} elever</div>
+    </div>`;
+  }).join('');
+  setv(`${bc()}<div class="view-header"><h2>${g.name}</h2><p>Välj klass</p></div>
+    <div class="pick-grid">${cards}</div>`);
+}
+
+function viewChildren(cls){
+  nav.cls=cls; nav.child=null;
+  const ch=S.children[cls]||[];
+  const rows=ch.length===0
+    ?`<div class="empty"><div class="ei">👤</div><p>Inga elever i klassen</p></div>`
+    :ch.map(name=>{
+      const loan=S.loans.find(l=>l.child===name&&l.cls===cls);
+      const init=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      return `<div class="child-row ${loan?'locked':''}" ${loan?'':(`onclick="viewToys('${e(name)}')"`)}>
+        <div class="child-avatar ${loan?'warn':''}">${loan?'⚠️':init}</div>
+        <div class="child-info">
+          <div class="child-name">${e(name)}</div>
+          <div class="child-sub ${loan?'warn':''}">${loan?loan.toyEmoji+' '+e(loan.toyName):'Ingen aktiv leksak'}</div>
+        </div>
+        <div class="pill ${loan?'busy':'free'}">${loan?'Har lån':'Ledig'}</div>
+      </div>`;
+    }).join('');
+  setv(`${bc()}<div class="view-header"><h2>${e(cls)}</h2><p>${ch.length} elever</p></div>
+    <div class="child-list">${rows}</div>`);
+}
+
+function viewToys(name){
+  nav.child=name;
+  const rows=S.toys.map(toy=>{
+    const av=toy.available;
+    const cls=av===0?'out':'';
+    const pc=av===0?'out':av<=1?'low':'ok';
+    const pt=av===0?'Slut':av+' kvar';
+    return `<div class="toy-card ${cls}" ${av>0?`onclick="confirmLoan('${e(name)}','${toy.id}')"`:''}> 
+      <div class="toy-emoji">${toy.emoji}</div>
+      <div class="toy-name">${e(toy.name)}</div>
+      <div class="toy-pill ${pc}">${pt} av ${toy.total}</div>
+    </div>`;
+  }).join('');
+  setv(`${bc()}<div class="view-header"><h2>${e(name)}</h2><p>Välj leksak att låna</p></div>
+    <div class="toy-grid">${rows}</div>`);
+}
+
+function confirmLoan(child,tid){
+  const toy=S.toys.find(t=>t.id===tid);
+  modal('Bekräfta lån',`${child} lånar ${toy.emoji} ${toy.name}`,'',
+    [{l:'Avbryt',f:closeModal,s:'btn-ghost'},{l:'✅ Bekräfta',f:()=>{doLoan(child,toy);closeModal();},s:'btn-primary'}]);
+}
+
+function doLoan(child,toy){
+  toy.available--;
+  const loan = {id:String(S.uid++),child,cls:nav.cls,grade:nav.grade,toyId:toy.id,toyEmoji:toy.emoji,toyName:toy.name,
+    time:new Date().toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'})};
+  S.loans.push(loan);
+  fsSaveToy(toy);
+  fsAddLoan(loan);
+  badge(); toast('✅ '+child+' lånade '+toy.emoji+' '+toy.name);
+  viewChildren(nav.cls);
+}
+
+/* ── LOANS ── */
+function viewLoans(){
+  if(!S.loans.length){
+    setv(`<div class="view-header"><h2>Aktiva lån</h2></div>
+      <div class="empty"><div class="ei">🧸</div><p>Inga aktiva lån just nu</p></div>`);
+    return;
+  }
+  const rows=S.loans.map(l=>{
+    const gn=S.grades.find(g=>g.id===l.grade)?.name||'';
+    return `<div class="loan-row">
+      <div class="loan-icon">${l.toyEmoji}</div>
+      <div class="loan-info">
+        <div class="loan-name">${e(l.child)} <span style="font-weight:400;color:var(--text-muted)">– ${e(l.toyName)}</span></div>
+        <div class="loan-meta">${e(gn)} · ${e(l.cls)} · Lånat ${l.time}</div>
+      </div>
+      <button class="btn-ret" onclick="retLoan('${l.id}')">↩ Lämna</button>
+    </div>`;
+  }).join('');
+  setv(`<div class="view-header"><h2>Aktiva lån</h2><p>${S.loans.length} utlånade leksaker</p></div>
+    <div class="loan-list">${rows}</div>`);
+}
+
+function retLoan(id){
+  id=String(id);
+  const l=S.loans.find(x=>String(x.id)===id); if(!l) return;
+  const toy=S.toys.find(t=>t.id===l.toyId); if(toy){ toy.available++; fsSaveToy(toy); }
+  S.loans=S.loans.filter(x=>x.id!==id);
+  fsRemoveLoan(id);
+  badge(); toast('↩ '+l.child+' lämnade tillbaka '+l.toyEmoji); viewLoans();
+}
+
+/* ── ADMIN ── */
+function viewAdmin(){ setv(buildAdmin()); }
+
+function buildAdmin(){
+  const toyRows=S.toys.map(toy=>{
+    const loaned=toy.total-toy.available;
+    return `<div class="adm-row">
+      <div class="ar-em">${toy.emoji}</div>
+      <div class="ar-nm">${e(toy.name)}</div>
+      <div class="ar-sb">${loaned?loaned+' utlånade':'Alla hemma'}</div>
+      <div class="cnt-ctrl">
+        <button class="cnt-btn" onclick="chToy('${toy.id}',-1)">−</button>
+        <div class="cnt-num">${toy.total}</div>
+        <button class="cnt-btn" onclick="chToy('${toy.id}',1)">+</button>
+      </div>
+      <button class="btn btn-danger" style="padding:6px 10px;font-size:12px" onclick="rmToy('${toy.id}')">🗑</button>
+    </div>`;
+  }).join('');
+
+  const gradeBlocks=S.grades.map(g=>{
+    const clsBlocks=g.classes.map(cls=>{
+      const ch=S.children[cls]||[];
+      const tags=ch.map(c=>`<div class="tag">${e(c)}<button class="tag-x" onclick="rmChild('${e(cls)}','${e(c)}')">×</button></div>`).join('');
+      return `<div class="cls-block">
+        <div class="cls-head">
+          <div class="cls-title">🏫 ${e(cls)}</div>
+          <span style="font-size:12px;color:var(--text-muted)">${ch.length} elever</span>
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:11px;margin-left:8px" onclick="rmCls('${e(cls)}','${g.id}')">🗑</button>
+        </div>
+        <div class="tags">${tags||'<span style="font-size:12px;color:var(--text-muted)">Inga elever</span>'}</div>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="font-size:20px">${g.emoji}</div>
+        <div style="font-weight:700;font-size:15px">${g.name}</div>
+        <button class="btn btn-danger" style="padding:4px 10px;font-size:11px;margin-left:auto" onclick="rmGrade('${g.id}')">🗑 Ta bort</button>
+      </div>${clsBlocks}
+    </div>`;
+  }).join('');
+
+  const gOpts=S.grades.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  const cOpts=S.grades.flatMap(g=>g.classes.map(c=>`<option value="${e(c)}">${e(c)} (${g.name})</option>`)).join('');
+
+  const promoRows=S.grades.map((g,i)=>{
+    const nxt=S.grades[i+1];
+    return `<div class="promo-row">
+      <div class="promo-from">${g.emoji} ${g.name}</div>
+      <div class="promo-arr">→</div>
+      <div class="promo-to">${nxt?nxt.name:'🎓 Slutar'}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="view-header">
+    <h2>⚙️ Admin</h2>
+    <p>Hantera leksaker, klasser och elever</p>
+  </div>
+
+  <div class="adm-sec">
+    <h3>🧸 Leksaker</h3>
+    ${toyRows}
+    <div class="add-form">
+      <input class="field" id="a-em" placeholder="Emoji" style="max-width:70px">
+      <input class="field" id="a-tn" placeholder="Namn t.ex. Fotboll">
+      <input class="field" id="a-tc" type="number" min="1" value="1" style="max-width:75px">
+      <button class="btn btn-primary" onclick="addToy()">+ Lägg till</button>
+    </div>
+  </div>
+
+  <div class="adm-sec">
+    <h3>🏫 Klasser & Elever</h3>
+    ${gradeBlocks}
+    <div class="add-form">
+      <input class="field" id="a-gn" placeholder="Ny årskurs t.ex. 4">
+      <button class="btn btn-primary" onclick="addGrade()">+ Ny årskurs</button>
+    </div>
+    <div class="add-form">
+      <select class="field" id="a-cg"><option value="">Välj årskurs</option>${gOpts}</select>
+      <input class="field" id="a-cn" placeholder="Klass t.ex. 1A">
+      <button class="btn btn-primary" onclick="addCls()">+ Ny klass</button>
+    </div>
+    <div class="add-form">
+      <select class="field" id="a-cc"><option value="">Välj klass</option>${cOpts}</select>
+      <input class="field" id="a-chname" placeholder="Elevens namn">
+      <button class="btn btn-primary" onclick="addChild()">+ Lägg till elev</button>
+    </div>
+  </div>
+
+  <div class="promo-card">
+    <h3>🎓 Flytta upp/ner en klass</h3>
+    <p>Varje läsår kan du flytta alla elever ett steg upp. Du kan även flytta ner om du råkade flytta fel.</p>
+    ${promoRows}
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="promote(1)">⬆️ Flytta upp alla</button>
+      <button class="btn btn-ghost"   onclick="promote(-1)">⬇️ Flytta ner alla</button>
+    </div>
+  </div>`;
+}
+
+/* ── LOCK ADMIN ── */
+function lockAdmin(){
+  go('klass');
+}
+
+/* ── ADMIN ACTIONS ── */
+function addToy(){
+  const em=fv('a-em')||'🎯', nm=fv('a-tn'), cnt=parseInt(fv('a-tc'))||1;
+  if(!nm){toast('Ange ett namn');return;}
+  const toy={id:'t'+S.uid++,emoji:em,name:nm,total:cnt,available:cnt};
+  S.toys.push(toy);
+  fsAddToy(toy);
+  toast('✅ '+em+' '+nm+' tillagd'); viewAdmin();
+}
+function chToy(id,d){
+  const t=S.toys.find(x=>x.id===id); if(!t) return;
+  const lo=t.total-t.available;
+  if(t.total+d<1||t.total+d<lo){toast('Kan inte minska under utlånat antal');return;}
+  t.total+=d; t.available=t.total-lo;
+  fsSaveToy(t);
+  viewAdmin();
+}
+function rmToy(id){
+  const t=S.toys.find(x=>x.id===id);
+  if(t.total-t.available>0){toast('Kan inte ta bort – finns utlånade');return;}
+  modal('Ta bort leksak',`Ta bort ${t.emoji} ${t.name}?`,'',
+    [{l:'Avbryt',f:closeModal,s:'btn-ghost'},{l:'🗑 Ta bort',f:()=>{S.toys=S.toys.filter(x=>x.id!==id);fsDeleteToy(id);closeModal();toast('Borttagen');viewAdmin();},s:'btn-danger'}]);
+}
+function addGrade(){
+  const nm=fv('a-gn'); if(!nm){toast('Ange namn');return;}
+  const emojis=['4️⃣','5️⃣','6️⃣','🌿','⭐','🎯'];
+  S.grades.push({id:'g'+S.uid++,name:'Åk '+nm,emoji:emojis[S.grades.length%emojis.length],classes:[]});
+  toast('✅ Årskurs tillagd'); viewAdmin();
+}
+function rmGrade(id){
+  const g=S.grades.find(x=>x.id===id);
+  modal('Ta bort '+g.name,'Alla klasser och elever tas bort. Fortsätta?','',
+    [{l:'Avbryt',f:closeModal,s:'btn-ghost'},{l:'🗑 Ta bort',f:()=>{
+      g.classes.forEach(c=>delete S.children[c]);
+      S.grades=S.grades.filter(x=>x.id!==id);
+      S.loans=S.loans.filter(l=>l.grade!==id);
+      closeModal();toast('Borttagen');badge();viewAdmin();
+    },s:'btn-danger'}]);
+}
+function addCls(){
+  const gid=fv('a-cg'), nm=fv('a-cn');
+  if(!gid||!nm){toast('Välj årskurs och ange klassnamn');return;}
+  const g=S.grades.find(x=>x.id===gid);
+  if(g.classes.includes(nm)){toast('Klassen finns redan');return;}
+  g.classes.push(nm); S.children[nm]=[];
+  toast('✅ Klass '+nm+' tillagd'); viewAdmin();
+}
+function rmCls(cls,gid){
+  modal('Ta bort '+cls,'Alla elever i klassen tas bort. Fortsätta?','',
+    [{l:'Avbryt',f:closeModal,s:'btn-ghost'},{l:'🗑 Ta bort',f:()=>{
+      const g=S.grades.find(x=>x.id===gid);
+      g.classes=g.classes.filter(c=>c!==cls);
+      delete S.children[cls];
+      S.loans=S.loans.filter(l=>l.cls!==cls);
+      closeModal();toast('Klass borttagen');badge();viewAdmin();
+    },s:'btn-danger'}]);
+}
+function addChild(){
+  const cls=fv('a-cc'), nm=fv('a-chname');
+  if(!cls||!nm){toast('Välj klass och ange namn');return;}
+  if(!S.children[cls]) S.children[cls]=[];
+  S.children[cls].push(nm);
+  toast('✅ '+nm+' tillagd'); viewAdmin();
+}
+function rmChild(cls,nm){
+  if(S.loans.find(l=>l.child===nm&&l.cls===cls)){toast('Eleven har aktivt lån – lämna tillbaka först');return;}
+  S.children[cls]=S.children[cls].filter(c=>c!==nm);
+  toast(nm+' borttagen'); viewAdmin();
+}
+function promote(dir){
+  const up=dir>0;
+  modal(up?'Flytta upp alla':'Flytta ner alla',
+    (up?'Elever i sista klassen tas bort (slutar).':'Elever i första klassen tas bort.')
+    +' Lån nollställs. Fortsätta?','',
+    [{l:'Avbryt',f:closeModal,s:'btn-ghost'},{l:(up?'⬆️ Flytta upp':'⬇️ Flytta ner'),f:()=>{
+      const newC={};
+      S.grades.forEach((g,gi)=>{
+        g.classes.forEach((cls,ci)=>{
+          const tg=up?S.grades[gi+1]:S.grades[gi-1];
+          if(tg){
+            const tc=tg.classes[ci]||tg.classes[0];
+            if(tc){if(!newC[tc])newC[tc]=[];newC[tc].push(...(S.children[cls]||[]));}
+          }
+        });
+      });
+      S.grades.forEach(g=>g.classes.forEach(c=>{if(!newC[c])newC[c]=[];}));
+      S.children=newC; S.loans=[]; badge();
+      closeModal(); toast('✅ Klart!'); viewAdmin();
+    },s:'btn-primary'}]);
+}
+
+/* ── BREADCRUMB ── */
+function bc(){
+  const parts=[`<span class="bc-item" onclick="viewGrades()">Alla klasser</span>`];
+  if(nav.grade){
+    const g=S.grades.find(x=>x.id===nav.grade);
+    parts.push(`<span class="bc-sep">›</span><span class="bc-item" onclick="viewClasses('${nav.grade}')">${g.name}</span>`);
+  }
+  if(nav.cls)   parts.push(`<span class="bc-sep">›</span><span class="bc-item" onclick="viewChildren('${e(nav.cls)}')">${e(nav.cls)}</span>`);
+  if(nav.child) parts.push(`<span class="bc-sep">›</span><span class="bc-cur">${e(nav.child)}</span>`);
+  return `<div class="breadcrumb">${parts.join('')}</div>`;
+}
+
+/* ── MODAL ── */
+function modal(title,desc,body,actions){
+  document.getElementById('mt').textContent=title;
+  document.getElementById('md').textContent=desc;
+  document.getElementById('mb').innerHTML=body;
+  const el=document.getElementById('ma'); el.innerHTML='';
+  actions.forEach(a=>{
+    const btn=document.createElement('button');
+    btn.className='btn '+a.s; btn.textContent=a.l; btn.onclick=a.f; el.appendChild(btn);
+  });
+  document.getElementById('mbg').classList.remove('hidden');
+}
+function closeModal(){ document.getElementById('mbg').classList.add('hidden'); }
+function mbgClick(ev){ if(ev.target===document.getElementById('mbg')) closeModal(); }
+
+/* ── TOAST ── */
+let _tt;
+function toast(msg){
+  const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+/* ── UTILS ── */
+function setv(html){ document.getElementById('view').innerHTML=html; }
+function fv(id){ return (document.getElementById(id)?.value||'').trim(); }
+function e(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// Init – show loading, then load from Firestore
+document.getElementById('view').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:16px;color:var(--text-muted)"><div style="font-size:40px">🔄</div><div style="font-size:15px;font-weight:600">Laddar data…</div></div>';
+fsLoadState().then(() => {
+  go('klass');
+});
+// Set initial toggle icon
+document.getElementById('sidebar-toggle').textContent = sidebarOpen ? '✕' : '☰';
+if(!sidebarOpen && window.innerWidth > 768){
+  document.getElementById('sidebar').classList.add('collapsed');
+}
+</script>
+</body>
+</html>
